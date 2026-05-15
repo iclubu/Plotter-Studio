@@ -2,6 +2,8 @@
 
 An interactive generative art studio designed specifically for pen plotters (Silhouette Cameo 5, AxiDraw, etc.). This tool transforms standard images into high-fidelity vector paths using advanced mathematical engines.
 
+<img width="1438" height="837" alt="Screenshot 2026-05-14 at 11 32 13 PM" src="https://github.com/user-attachments/assets/537df02b-f308-4a5f-bc93-d43cdf7257c1" />
+
 
 ## 🚀 The Three Art Engines
 
