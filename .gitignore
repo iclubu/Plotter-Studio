@@ -1,8 +1,6 @@
-.venv/
+venv/
 __pycache__/
-*.pyc
-.claude/
-artwork/
-out.svg
-tools/node_modules/
-tools/.beatles_lyrics_cache.json
+.DS_Store
+*.svg
+input.jpg
+media/
