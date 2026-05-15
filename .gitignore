@@ -4,3 +4,9 @@ __pycache__/
 *.svg
 input.jpg
 media/
+static/
+tests/
+tools/
+server.py
+start.sh
+generate_fmm.py

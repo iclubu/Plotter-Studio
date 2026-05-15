@@ -42,7 +42,7 @@ elif mode == "Squiggle (Structured Shading)":
 elif mode == "Line Sketch (Contour Streamlines)":
     st.sidebar.header("Streamline Settings")
     line_count = st.sidebar.slider("Number of Streamlines", 500, 10000, 3000)
-    max_steps = st.sidebar.slider("Stroke Continuity", 5, 100, 30, help="How long the pen stays down")
+    max_steps = st.sidebar.slider("Stroke Continuity", 5, 100, 30)
     step_size = st.sidebar.slider("Step Size", 1.0, 5.0, 2.0)
     flow_smoothness = st.sidebar.slider("Flow Smoothness", 1, 10, 3)
 
@@ -91,33 +91,24 @@ if uploaded_file is not None:
             fig.add_trace(go.Scatter(x=c[:, 1], y=h - c[:, 0], mode='lines', 
                                      line=dict(color='#ffcc00', width=0.7), showlegend=False))
 
-    # --- ENGINE 3: CONTOUR STREAMLINES (The Fix) ---
+    # --- ENGINE 3: CONTOUR STREAMLINES ---
     elif mode == "Line Sketch (Contour Streamlines)":
-        # Calculate Flow (Gradients)
         img_blur_sketch = filters.gaussian(img_gray, sigma=flow_smoothness)
         gx = filters.scharr_v(img_blur_sketch)
         gy = filters.scharr_h(img_blur_sketch)
         
         for _ in range(line_count):
             ry, rx = random.randint(0, h-1), random.randint(0, w-1)
-            
-            # Shading check
             if random.random() < (1.0 - img_gray[ry, rx])**2:
                 path = [[ry, rx]]
                 curr_y, curr_x = float(ry), float(rx)
-                
                 for _ in range(max_steps):
                     iy, ix = int(curr_y), int(curr_x)
                     if not (0 <= iy < h and 0 <= ix < w): break
-                    
-                    # Follow the contour (perpendicular to gradient)
                     angle = np.arctan2(gy[iy, ix], gx[iy, ix]) + np.pi/2
-                    
                     curr_y += np.sin(angle) * step_size
                     curr_x += np.cos(angle) * step_size
                     path.append([curr_y, curr_x])
-                    
-                    # If we hit a highlight, stop the line
                     if 0 <= int(curr_y) < h and 0 <= int(curr_x) < w:
                         if img_gray[int(curr_y), int(curr_x)] > 0.9: break
                 
@@ -144,7 +135,7 @@ if uploaded_file is not None:
 
     # --- EXPORT ---
     if st.button("🚀 Export SVG"):
-        svg_filename = "sketch_studio_output.svg"
+        svg_filename = "plotter_studio_output.svg"
         final_h_mm = h * pixel_to_mm_scale
         with open(svg_filename, 'w') as f:
             f.write(f'<svg xmlns="http://www.w3.org/2000/svg" width="{target_width_mm}mm" height="{final_h_mm}mm" viewBox="0 0 {w} {h}">\n')
