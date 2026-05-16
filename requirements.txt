@@ -1,5 +1,5 @@
-fastapi
-uvicorn[standard]
-pyserial
-websockets
-python-multipart
+streamlit
+numpy
+scikit-fmm
+scikit-image
+plotly
