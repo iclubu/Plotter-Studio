@@ -181,7 +181,7 @@ greyscale point placement). Enables full multi-pen colour plotting on the Cameo 
 
 ### ⚡ Faster installs with uv
 
-If you have `uv` installed, you can install dependencies even faster:
+### If you have `uv` installed, you can install dependencies even faster:
 
 ```bash
 uv pip install -r requirements.txt
