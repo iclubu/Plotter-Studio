@@ -3,3 +3,9 @@ uvicorn[standard]
 pyserial
 websockets
 python-multipart
+streamlit
+scikit-fmm
+scikit-image
+plotly
+numpy
+scipy
