@@ -1,8 +1,4 @@
 # 🎨 Universal Plotter Studio v5.5
-![Uploading Screenshot 2026-08-14 at 10.15.26 AM.png…]()
-
-
-
 An interactive generative art studio for pen plotters (Silhouette Cameo 5, AxiDraw, etc.).
 Nine art engines, image masking, Perlin noise wobble, full vpype pipeline,
 multi-pass pen pressure, and CMYK layer export.
