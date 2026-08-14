@@ -1,0 +1,23 @@
+[project]
+name = "plotter-studio"
+version = "5.5.0"
+description = "Generative art studio for pen plotters (Cameo 5, AxiDraw)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pyserial",
+    "websockets",
+    "python-multipart",
+    "streamlit",
+    "scikit-fmm",
+    "scikit-image",
+    "plotly",
+    "numpy",
+    "scipy",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

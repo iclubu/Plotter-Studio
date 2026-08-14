@@ -179,6 +179,19 @@ greyscale point placement). Enables full multi-pen colour plotting on the Cameo 
 
 ## 🛠 Setup
 
+### ⚡ Faster installs with uv
+
+If you have `uv` installed, you can install dependencies even faster:
+
+```bash
+uv pip install -r requirements.txt
+
+For fully reproducible builds, use the lockfile:
+```
+```bash
+uv pip sync uv.lock
+```
+
 ```bash
 git clone https://github.com/iclubu/Plotter-Studio.git
 cd Plotter-Studio
