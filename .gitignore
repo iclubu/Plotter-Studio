@@ -10,3 +10,4 @@ tools/
 server.py
 start.sh
 generate_fmm.py
+media/
