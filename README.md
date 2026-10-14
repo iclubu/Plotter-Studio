@@ -1,5 +1,4 @@
-
-# 🎨 Universal Plotter Studio v5.5
+# 🎨 Universal Plotter Studio v5.5.2
 An interactive generative art studio for pen plotters (Silhouette Cameo 5, AxiDraw, etc.).
 Nine art engines, image masking, Perlin noise wobble, full vpype pipeline,
 multi-pass pen pressure, and CMYK layer export.
@@ -74,9 +73,13 @@ Inspired by PINTR and StringyPlotter. Uses Voronoi stippling for point placement
 (Lloyd's relaxation), then chains all points into one continuous path using a greedy
 nearest-neighbour TSP approximation.
 **Key controls:** Number of Points, White Threshold, Lloyd Iterations.
-**Note:** True TSP is NP-hard — the greedy approximation produces excellent results
-in seconds. For finest quality on large point counts, run the exported SVG through
-`vpype linesort --two-opt` after export.
+**How it works:** points are chained with a cKDTree nearest-neighbour tour, then a
+time-limited 2-opt pass (2 s while tuning, 10 s on export) removes the long crossing
+jumps the greedy chain leaves behind (typically ~10% shorter). True TSP is NP-hard, so
+this is a good local optimum, not the optimum.
+**Note:** `vpype linesort --two-opt` does *not* improve this engine's output — it
+reorders separate paths, and this engine emits a single path, so there is nothing for
+it to reorder. Raise the point count or 2-opt time instead.
 
 ---
 
@@ -131,11 +134,32 @@ engine independently on each. Exports a ZIP containing four SVGs:
 - `black.svg` — plot with black pen
 
 Available on all engines except Voronoi Stippling and Continuous Line (which use
-greyscale point placement). Enables full multi-pen colour plotting on the Cameo 5.
+greyscale point placement; the app shows a warning if CMYK is on with those). Channels
+with no ink are skipped. Enables full multi-pen colour plotting on the Cameo 5.
+Note: wobble, pen passes and vpype are applied to the main SVG only, not the CMYK layers.
 
 ---
 
 ## ✅ Changelog
+
+### v5.5.2
+- **Build export button** — the full-resolution export (wobble, pen passes, vpype,
+  CMYK ZIP) now runs only when clicked and is kept in session state; sliders only
+  update the fast preview. A warning shows if settings changed since the last build.
+- **Preview matches export** — pixel-unit settings (blur sigmas, RDP tolerances,
+  squiggle spacing/amplitude, needle grid/length, dot radius, Blueprint
+  neighbourhood/welding, wobble) are scaled by the real preview→export width ratio.
+  Canny and Needles gradient thresholds are scaled by its inverse.
+- **CMYK fix** — channels are ink density; Blueprint, Squiggle, Isoline, Fast Marching
+  and Streamlines now receive brightness. Blueprint CMYK now honours Line Welding and
+  Centreline Thinning. RGBA/16-bit sources no longer produce near-black CMYK.
+- **Wobble** is vectorised (~35x faster), shown in the preview, and its amplitude/scale
+  are defined at preview resolution.
+- **Continuous Line** — cKDTree nearest neighbour + time-limited 2-opt.
+- **Image loading** — EXIF rotation, 16-bit greyscale, gray+alpha and palette alpha.
+- Seeded stippling; Lloyd centroids use the true Voronoi cell; stipple no longer
+  errors when fewer dark pixels than points exist; plot-time estimate includes
+  pen-up travel; one version number across README, pyproject and the app.
 
 ### v5.5.1
 - **Fast Marching: Speed Offset slider** — minimum wave speed is now tunable
@@ -225,13 +249,13 @@ plotter
 2. Choose engine. For existing drawings: **Sobel Edge** or **Blueprint**.
    For portraits: **Fast Marching** with manual seed between the eyebrows.
    For dot art: **Voronoi Stippling**. For single continuous line: **Continuous Line (TSP)**.
-3. Tune sliders — keep vpype, Wobble, Pen Passes and CMYK **OFF** while tuning.
+3. Tune sliders. The preview shows wobble; vpype, Pen Passes and CMYK only run on export.
 4. When happy:
    - Enable **Perlin Noise Wobble** for hand-drawn quality (optional).
    - Enable **Pen Passes** for ballpoint shadow density (optional).
    - Enable **CMYK Export** for multi-pen colour plotting (optional).
    - Turn **vpype pipeline ON**.
-5. Hit **Download SVG (vpype optimised)** or **Download CMYK ZIP**.
+5. Click **🛠 Build export**, then **Download SVG (vpype optimised)** or **Download CMYK ZIP**.
 6. Open in **Silhouette Studio** → Sketch Pen mode → lock physical dimensions.
 
 ---
@@ -247,4 +271,3 @@ plotter
 | `push.sh` | Git push helper |
 
 `generate_fmm.py` is no longer needed and can be deleted.
-

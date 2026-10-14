@@ -1,6 +1,6 @@
 [project]
 name = "plotter-studio"
-version = "5.5.0"
+version = "5.5.2"
 description = "Generative art studio for pen plotters (Cameo 5, AxiDraw)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,6 +16,7 @@ dependencies = [
     "plotly",
     "numpy",
     "scipy",
+    "pillow",
 ]
 
 [build-system]
