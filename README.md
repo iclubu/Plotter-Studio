@@ -3,7 +3,8 @@ An interactive generative art studio for pen plotters (Silhouette Cameo 5, AxiDr
 Nine art engines, image masking, Perlin noise wobble, full vpype pipeline,
 multi-pass pen pressure, and CMYK layer export.
 
-<img width="2447" height="1343" alt="Screenshot 2026-10-14 at 1 44 31 PM" src="https://github.com/user-attachments/assets/9a250e69-ac20-4572-8308-0ee3e18d63b0" />
+<img width="2447" height="1343" alt="Screenshot 2026-10-14 at 1 44 31 PM" src="https://github.com/user-attachments/assets/6a557681-cfb7-4e43-964c-a4c292513549" />
+
 
 ---
 
