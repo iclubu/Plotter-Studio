@@ -67,6 +67,8 @@ from scipy.spatial import cKDTree
 from skimage import color, exposure, feature, filters, measure, transform
 from skimage.morphology import closing, skeletonize, square
 
+from centreline import trace_centrelines
+
 APP_VERSION = "5.5.2"
 STIPPLE_SEED = 12345          # fixed RNG seed -> repeatable stipple/TSP layouts
 TSP_TIME_PREVIEW = 2.0        # seconds of 2-opt while tuning
@@ -699,27 +701,24 @@ def _load_alpha_mask(file_bytes, mx, my, mw, mh, max_px):
     return _cap_image(alpha, max_px)
 
 
-def _blueprint_mask(img, grid_size, contrast_offset, line_weld, use_thinning,
-                    pre_sigma=0.6):
-    """img is BRIGHTNESS (0 = dark). Returns a boolean ink mask."""
+def _blueprint_mask(img, grid_size, contrast_offset, line_weld, pre_sigma=0.6):
+    """img is BRIGHTNESS (0 = dark). Returns a boolean ink mask. Centreline
+    thinning happens in _contours_blueprint, which needs the full-width mask."""
     pre    = filters.gaussian(img, sigma=pre_sigma)
     thresh = filters.threshold_local(pre, block_size=grid_size,
                                      method="gaussian", offset=contrast_offset)
     binary = pre < thresh
     if line_weld > 1:
         binary = closing(binary, square(line_weld))
-    if use_thinning:
-        binary = skeletonize(binary)
     return binary
 
 
 @st.cache_data(show_spinner=False)
 def _preprocess_blueprint(img_bytes, mx, my, mw, mh, max_px,
-                           grid_size, contrast_offset, line_weld, use_thinning,
-                           pre_sigma=0.6):
+                           grid_size, contrast_offset, line_weld, pre_sigma=0.6):
     img = _load_masked(img_bytes, mx, my, mw, mh, max_px)
     return img.shape, _blueprint_mask(img, grid_size, contrast_offset,
-                                      line_weld, use_thinning, pre_sigma)
+                                      line_weld, pre_sigma)
 
 
 @st.cache_data(show_spinner=False)
@@ -841,10 +840,9 @@ def _preprocess_needles(img_bytes, mx, my, mw, mh, max_px, sigma):
 # CACHED CONTOUR / PATH STEPS
 # ─────────────────────────────────────────────
 
-@st.cache_data(show_spinner=False)
-def _contours_blueprint(key, mask, path_tolerance, min_len):
+def _simplify_filter_sort(raw_paths, path_tolerance, min_len):
     paths = []
-    for c in measure.find_contours(mask, 0.5):
+    for c in raw_paths:
         if path_tolerance > 0:
             c = measure.approximate_polygon(c, tolerance=path_tolerance)
         if len(c) > min_len:
@@ -853,14 +851,27 @@ def _contours_blueprint(key, mask, path_tolerance, min_len):
 
 
 @st.cache_data(show_spinner=False)
-def _contours_sobel(key, edges, path_tolerance, min_len):
-    paths = []
-    for c in measure.find_contours(edges.astype(float), 0.5):
-        if path_tolerance > 0:
-            c = measure.approximate_polygon(c, tolerance=path_tolerance)
-        if len(c) > min_len:
-            paths.append(c)
-    return _nearest_neighbour_sort(paths)
+def _contours_blueprint(key, mask, path_tolerance, min_len,
+                        centreline=False, spur_len=8):
+    """centreline=True: one stroke per drawn line (skeleton tracing).
+    centreline=False: outline of each inked region (find_contours)."""
+    if centreline:
+        raw = trace_centrelines(skeletonize(mask), mask=mask, spur_len=spur_len)
+    else:
+        raw = measure.find_contours(mask, 0.5)
+    return _simplify_filter_sort(raw, path_tolerance, min_len)
+
+
+@st.cache_data(show_spinner=False)
+def _contours_sobel(key, edges, path_tolerance, min_len,
+                    centreline=False, spur_len=8):
+    """Canny edges are ~1 px wide, so find_contours traces both sides of every
+    edge; centreline=True traces each edge once."""
+    if centreline:
+        raw = trace_centrelines(skeletonize(edges), spur_len=spur_len)
+    else:
+        raw = measure.find_contours(edges.astype(float), 0.5)
+    return _simplify_filter_sort(raw, path_tolerance, min_len)
 
 
 @st.cache_data(show_spinner=False)
@@ -1151,16 +1162,24 @@ if uploaded_file is not None:
             grid_size       = st.sidebar.slider("Neighbourhood Size", 3, 99, 25, step=2)
             contrast_offset = st.sidebar.slider("Contrast Offset", -0.2, 0.2, 0.02, step=0.01)
             line_weld       = st.sidebar.slider("Line Welding", 1, 9, 3, step=1)
-            use_thinning    = st.sidebar.checkbox("Centreline Thinning", value=False)
+            use_thinning    = st.sidebar.checkbox(
+                "Centreline (single stroke)", value=True,
+                help="Trace the middle of each drawn line once. Off = trace the "
+                     "outline of each stroke (two lines per stroke).")
+            spur_len        = st.sidebar.slider(
+                "Spur Removal (px)", 0, 30, 8, disabled=not use_thinning,
+                help="Remove short side-branches (hairs) the skeleton grows from "
+                     "bumps and ink blots. Also scales with stroke width.")
             path_tolerance  = st.sidebar.slider("Path Smoothing (RDP)", 0.0, 2.0, 0.3)
             stroke_width    = st.sidebar.slider("SVG Stroke Width", 0.1, 3.0, 1.0, step=0.1)
 
             shape, mask = _preprocess_blueprint(
-                file_bytes, *mk, TUNE_PX, grid_size, contrast_offset, line_weld, use_thinning
+                file_bytes, *mk, TUNE_PX, grid_size, contrast_offset, line_weld
             )
             h, w = shape
             key  = (*mk, grid_size, contrast_offset, line_weld, use_thinning)
-            export_paths = _contours_blueprint(key, mask, path_tolerance, min_line_len)
+            export_paths = _contours_blueprint(key, mask, path_tolerance, min_line_len,
+                                               use_thinning, spur_len)
             preview_style = ("#00ff88", 1.0)
 
             # Pixel-unit settings at export resolution
@@ -1168,21 +1187,24 @@ if uploaded_file is not None:
             bp_weld_x = _scale_weld(line_weld, exp_scale)
             bp_sig_x  = 0.6 * exp_scale
             bp_tol_x  = path_tolerance * exp_scale
+            bp_spur_x = spur_len * exp_scale
 
             def _get_export():
                 s2, m2 = _preprocess_blueprint(
                     file_bytes, *mk, EXPORT_PX, bp_grid_x, contrast_offset, bp_weld_x,
-                    use_thinning, bp_sig_x)
+                    bp_sig_x)
                 k2 = (*mk, grid_size, contrast_offset, line_weld, use_thinning, "exp")
-                return _contours_blueprint(k2, m2, bp_tol_x, min_line_len), s2, _load_masked(file_bytes, *mk, EXPORT_PX)
+                return _contours_blueprint(k2, m2, bp_tol_x, min_line_len,
+                                           use_thinning, bp_spur_x), s2, _load_masked(file_bytes, *mk, EXPORT_PX)
 
             if use_cmyk:
                 def cmyk_engine_fn():
                     out = {}
                     for name, ink in _cmyk_ink_channels(file_bytes, mk, EXPORT_PX):
                         m2 = _blueprint_mask(1.0 - ink, bp_grid_x, contrast_offset,
-                                             bp_weld_x, use_thinning, bp_sig_x)
-                        out[name] = _contours_blueprint((*mk, name), m2, bp_tol_x, min_line_len)
+                                             bp_weld_x, bp_sig_x)
+                        out[name] = _contours_blueprint((*mk, name), m2, bp_tol_x, min_line_len,
+                                                        use_thinning, bp_spur_x)
                     return out
 
         # ── SOBEL EDGE ────────────────────────────────────────────────────
@@ -1191,6 +1213,12 @@ if uploaded_file is not None:
             sigma       = st.sidebar.slider("Edge Blur (sigma)", 0.5, 5.0, 1.5, step=0.1)
             low_thresh  = st.sidebar.slider("Low Threshold", 0.0, 0.3, 0.05, step=0.01)
             high_thresh = st.sidebar.slider("High Threshold", 0.1, 0.9, 0.20, step=0.01)
+            sb_centre   = st.sidebar.checkbox(
+                "Centreline (single stroke)", value=True,
+                help="Trace each edge once. Off = legacy tracing, which draws both "
+                     "sides of every 1-px edge.")
+            sb_spur     = st.sidebar.slider("Spur Removal (px)", 0, 30, 6,
+                                            disabled=not sb_centre)
             path_tol    = st.sidebar.slider("Path Smoothing (RDP)", 0.0, 2.0, 0.3)
             stroke_width= st.sidebar.slider("SVG Stroke Width", 0.1, 3.0, 0.8, step=0.1)
 
@@ -1198,7 +1226,8 @@ if uploaded_file is not None:
                 file_bytes, *mk, TUNE_PX, sigma, low_thresh, high_thresh)
             h, w = shape
             key  = (*mk, sigma, low_thresh, high_thresh)
-            export_paths = _contours_sobel(key, edges, path_tol, min_line_len)
+            export_paths = _contours_sobel(key, edges, path_tol, min_line_len,
+                                           sb_centre, sb_spur)
             preview_style = ("#00ff88", 0.8)
 
             # Gradient magnitude is per-pixel, so it shrinks by 1/scale at higher
@@ -1207,11 +1236,13 @@ if uploaded_file is not None:
             sb_low_x  = low_thresh / exp_scale
             sb_high_x = high_thresh / exp_scale
             sb_tol_x  = path_tol * exp_scale
+            sb_spur_x = sb_spur * exp_scale
 
             def _get_export():
                 s2, e2 = _preprocess_sobel(file_bytes, *mk, EXPORT_PX, sb_sig_x, sb_low_x, sb_high_x)
                 k2 = (*mk, sigma, low_thresh, high_thresh, "exp")
-                return _contours_sobel(k2, e2, sb_tol_x, min_line_len), s2, _load_masked(file_bytes, *mk, EXPORT_PX)
+                return _contours_sobel(k2, e2, sb_tol_x, min_line_len,
+                                       sb_centre, sb_spur_x), s2, _load_masked(file_bytes, *mk, EXPORT_PX)
 
             if use_cmyk:
                 def cmyk_engine_fn():
@@ -1220,7 +1251,8 @@ if uploaded_file is not None:
                     for name, ink in _cmyk_ink_channels(file_bytes, mk, EXPORT_PX):
                         edges_c = feature.canny(ink, sigma=sb_sig_x, low_threshold=sb_low_x,
                                                 high_threshold=sb_high_x)
-                        out[name] = _contours_sobel((*mk, name), edges_c, sb_tol_x, min_line_len)
+                        out[name] = _contours_sobel((*mk, name), edges_c, sb_tol_x, min_line_len,
+                                                    sb_centre, sb_spur_x)
                     return out
 
         # ── SQUIGGLE ──────────────────────────────────────────────────────

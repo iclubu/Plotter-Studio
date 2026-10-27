@@ -12,8 +12,11 @@ multi-pass pen pressure, and CMYK layer export.
 
 ### 1. Blueprint (Sketch Trace)
 Adaptive local thresholding extracts drawn strokes from existing ink/pencil drawings.
-Best for scanned hand-drawn art. Morphological welding closes gaps; optional
-skeletonisation reduces each stroke to a single centreline.
+Best for scanned hand-drawn art. Morphological welding closes gaps; **Centreline
+(single stroke)** (on by default) skeletonises each stroke and traces its middle
+once, so every drawn line is plotted once instead of as a two-sided outline.
+**Spur Removal** trims the short hairs that bumps and ink blots grow on the
+skeleton. Turn Centreline off to trace stroke outlines instead.
 
 ### 2. Sobel Edge (Outline)
 Canny edge detection + contour tracing. Crisp single-stroke outlines from high-contrast
@@ -267,6 +270,7 @@ plotter
 | File | Purpose |
 |---|---|
 | `fmm_studio.py` | Main Streamlit app — all nine engines |
+| `centreline.py` | Skeleton → single-stroke polyline tracing (Blueprint, Sobel Edge) |
 | `server.py` | FastAPI plotter control backend (WebSocket + G-code queue) |
 | `start.sh` | Launch script for the FastAPI server |
 | `requirements.txt` | Python dependencies |
